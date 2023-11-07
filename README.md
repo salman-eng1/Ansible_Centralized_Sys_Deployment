@@ -1,5 +1,5 @@
 
-__________________________________________________QMS deployment with Ansible _________________________________________________
+__________________________________________QMS deployment with Ansible ___________________________________________
 
 - install ansible on the master node
 - extract the attached playbooks into /etc/ansible/ 
