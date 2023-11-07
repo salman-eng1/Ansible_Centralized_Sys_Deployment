@@ -1,5 +1,5 @@
 
-_______________________QMS deployment with Ansible ____________________________
+__________________________________________________QMS deployment with Ansible _________________________________________________
 
 - install ansible on the master node
 - extract the attached playbooks into /etc/ansible/ 
@@ -7,12 +7,12 @@ _______________________QMS deployment with Ansible ____________________________
 
 - add the lines below to /etc/ansible/ansible.cfg:
      
-     [privilege_escalation]
-     become= True
-     become_method= sudo
-     [defaults]
-     Host_key_checking = False
-     #ansible_ssh_extra_args='-o StrictHostKeyChecking=no
+     - [privilege_escalation]
+     - become= True
+     - become_method= sudo
+     - [defaults]
+     - Host_key_checking = False
+     - ansible_ssh_extra_args='-o StrictHostKeyChecking=no
 
 - read the file /etc/ansible/hosts, then setup the required information 
 - execute the commands:
