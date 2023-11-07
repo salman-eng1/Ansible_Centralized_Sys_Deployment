@@ -1,0 +1,70 @@
+- name: setup Mysql Server  and remote login
+  become: yes
+  hosts: webservers
+  tasks:
+    - name: Installing Mysql  and dependencies
+      package:
+        name: "{{item}}"
+        state: present
+        update_cache: yes
+      loop:
+        - mysql-server
+        - mysql-client
+        - python3-mysqldb
+        - libmysqlclient-dev
+      become: yes
+
+    - name: start and enable mysql service
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: creating databases
+      mysql_db:
+        name: "local_DB"
+        state: present
+      register: local_DB
+
+    - name: creating central_DB
+      mysql_db:
+        name: "central_DB"
+        state: present
+      when: ansible_host == central_db_ip
+      register: central_DB
+
+    - name: creating mysql user
+      mysql_user:
+        name: "ubuntu"
+        password: "{{db_password}}"
+        priv: "{{item}}.*:ALL"
+        append_privs: true
+        host: "%"
+        state: present
+      with_items:
+        - local_DB
+        - central_DB
+      register: user_ubuntu
+
+    # - name: print
+    #  debug:
+    #     msg: "{{item.stdout}}"
+    #    with_items:
+
+    #       - local_DB
+    #        - central_DB
+    #  - user_ubuntu
+
+    - name: Enable remote login to mysql
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: "^bind-address"
+        line: "bind-address = 0.0.0.0"
+        backup: yes
+      notify:
+        - Restart mysql
+  handlers:
+    - name: Restart mysql
+      service:
+        name: mysql
+        state: restarted

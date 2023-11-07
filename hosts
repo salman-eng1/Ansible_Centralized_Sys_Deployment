@@ -1,0 +1,72 @@
+#############################################################################################################################################################################################################################3
+
+             ####  #####   # #                #  #              # #     #####                                                                         
+             #  #  #       #   #            #           # #     #   #   #                                                           
+             ####  #       #    #          #          #     #   #    #  #                                                          
+             ##    #####   #    #          #          #     #   #    #  #####                                                                                       
+             # #   #       #   #            #         #     #   #   #   #
+             #  #  #####   # #                # #       #  #    # #     #####
+
+########################################################################################################################################################################################################################################################################################################################################################################################
+
+#To Deploy multi branches with one central branch, follow the bellow instructions below:
+#1) read the vairaiables below to understand each one of them
+#host_name
+#ansible_host: ip address for the branch server
+#branch_name: used is setupcrone
+#central_app_server=true: refers to the server will be used as central (required)
+#ansible_user: the user will be used to connect the nodes for the first time after fresh ubuntu install so mostly it's "ubuntu"
+#central_db_ip: sam as central host                                 
+#[webservers]: group of servers
+#[all:vars]: specify the shared variables across nodes
+#2) assume you have 4 local branches connected to central branch, in this case you need to wright the following:
+
+#[webservers]
+# central_server ansible_host=192.168.1.10 branch_name=baghdad central_app_server=true ansible_user=ubuntu central_tag=true
+# node1 ansible_host=serverIP branch_name=erbil ansible_user=ubuntu
+# node2 ansible_host=serverIP branch_name=dahok ansible_user=ubuntu
+# node3 ansible_host=serverIP branch_name=najef ansible_user=ubuntu
+# node4 ansible_host=serverIP branch_name=erbil ansible_user=ubuntu
+#[all:vars]
+#central_db_ip=serverIP
+#db_password=*******
+#ansible_python_interpreter=/usr/bin/python3
+
+
+# Ex 2: A collection of hosts belonging to the 'webservers' group:
+[webservers]
+## alpha.example.org
+## beta.example.org
+vm1 ansible_host=serverIP branch_name=syria local_app_server=true ansible_user=vm1
+Central ansible_host=1 branch_name=uk central_app_server=true ansible_user=central central_tag=true
+#local_Dell  ansible_host=serverIP branch_name=vmware local_app_server=true ansible_user=vm1
+
+[dbservers]
+#dbserver_central ansible_host=serverIP central_tag=true
+#dbserver_local_1 ansible_host=serverIP
+[all:vars]
+central_db_ip=192.168.101.136
+db_password=***********
+ansible_python_interpreter=/usr/bin/python3
+
+
+# If you have multiple hosts following a pattern, you can specify
+# them like this:
+
+## www[001:006].example.com
+
+# Ex 3: A collection of database servers in the 'dbservers' group:
+
+## [dbservers]
+##
+## db01.intranet.mydomain.net
+## db02.intranet.mydomain.net
+## serverIP
+## serverIP
+
+# Here's another example of host ranges, this time there are no
+# leading 0s:
+
+## db-[99:101]-node.example.com
+
+ 

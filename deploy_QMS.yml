@@ -1,0 +1,360 @@
+- hosts: webservers
+  become: true
+  vars:
+    - Projects:
+        [
+          "msa",
+          "ems",
+          "display",
+          "csa",
+          "MobileWCSA",
+          "keypad",
+          "glarus_config",
+        ]
+    - local_Projects: ["ems", "display", "keypad", "glarus_config"]
+  tasks:
+    ##############################SETUP MYSQL DATABASE #########################
+
+    ###################### create users ##############################
+    - name: check ubuntu user
+      stat:
+        path: /home/ubuntu
+      register: check_ubuntu_user
+
+    - name: Add the user ubuntu
+      ansible.builtin.user:
+        name: ubuntu
+        comment: ubuntu
+        uid: 1078
+        group: sudo
+        createhome: yes
+        home: /home/ubuntu
+      register: user_ubuntu
+    #      when: not check_ubuntu_user.stat.exists
+
+    - name: give sudo privilleges for ubuntu
+      community.general.sudoers:
+        name: "{{item}}"
+        state: present
+        user: "{{item}}"
+        runas: ALL:ALL
+        commands: ALL
+        nopassword: yes
+      with_items:
+        - ubuntu
+        - "{{ansible_user}}"
+
+    - name: give sudo privillages for apache
+      community.general.sudoers:
+        name: www-data
+        state: present
+        user: www-data
+        commands:
+          - /usr/sbin/reboot
+          - /etc/crontab
+          - /etc/apache2/ports.conf
+          - /bin/chmod
+          - /usr/bin/echo
+          - /usr/bin/php
+          - /bin/chown,/bin/chgrp
+          - /usr/bin/tmux
+          - /bin/bash
+          - /tmp/redis
+          - /usr/bin/pkill
+          - /bin/find
+          - /usr/bin/sed
+          - /bin/systemctl restart cron.service
+          - /usr/sbin/a2enconf,/usr/sbin/a2disconf
+          - /bin/systemctl reload apache2.service
+          - /usr/sbin/a2disconf,/usr/sbin/a2enconf
+          - /etc/init.d/shellinabox
+          - /bin/systemctl enable ssh,/bin/systemctl disable ssh
+          - /bin/systemctl start ssh, /bin/systemctl stop ssh
+        nopassword: yes
+    ######################## prepare packages ###############################
+    - name: Install Packages
+      apt: name={{ item }} update_cache=yes state=present
+      register: packages_installed
+      until: "packages_installed is not failed"
+      retries: 5
+      delay: 30
+      loop:
+        [
+          "vim",
+          "apache2",
+          "redis-server",
+          "zip",
+          "npm",
+          "software-properties-common",
+          "tmux",
+          "acl",
+        ]
+
+    - name: "Repo PHP 7.4"
+      apt_repository: repo="ppa:ondrej/php" state=present
+
+    - name: "Updating the repo"
+      apt: update_cache=yes
+
+    - name: Installation PHP 7.4
+      apt: name=php7.4 state=present
+
+    - name: set permissions on www folder
+      shell: "chown -R ubuntu:sudo /var/www"
+
+    - name: install lamp stack
+      apt:
+        pkg:
+          - php7.4-mysql
+          - php7.4-curl
+          - php7.4-json
+          - php7.4-cgi
+          - php7.4-xsl
+          - php7.4-cgi
+          - php7.4-gd
+          - php7.4-mbstring
+          - php7.4-zip
+          - php7.4-xmlrpc
+          - php7.4-soap
+          - php7.4-intl
+          - php7.4-xml
+          - php7.4-bcmath
+          - libapache2-mod-php7.4
+        state: present
+        update_cache: yes
+
+    - name: check composer
+      stat:
+        path: /usr/local/bin/composer
+      register: check_composer
+
+    - name: download composer
+      shell: "{{item}}"
+      with_items:
+        - php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+        - php -r "if (hash_file('sha384', 'composer-setup.php') === '55ce33d7678c5a611085589f1f3ddf8b3c52d662cd01d4ba75c0ee0459970c2200a51f492d557530c71c15d8dba01eae') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+        - php composer-setup.php
+        - php -r "unlink('composer-setup.php');"
+        - mv composer.phar /usr/local/bin/composer
+      when: not check_composer.stat.exists
+
+    ############################# setup projects ##################################
+
+    - name: Clone central branch Projects Repository
+      become_user: ubuntu
+      become: true
+      git:
+        repo: "https://salman:{{token******}}@gitlab.com/{{path}}/{{item}}.git"
+        dest: /var/www/{{item}}
+        clone: yes
+        force: yes
+        update: true
+      async: 2000
+      poll: 20
+      register: cloned
+      until: "cloned is not failed"
+      retries: 10
+      delay: 5
+      with_items:
+        - "{{Projects}}"
+      when: ansible_host == central_db_ip
+
+    - name: Clone Sub Branches Projects Repository
+      become_user: ubuntu
+      become: true
+      git:
+        repo: "https://salman:{{token*********}}@gitlab.com/zeour1/{{path}}/{{item}}.git"
+        dest: /var/www/{{item}}
+        clone: yes
+        force: yes
+        update: true
+      async: 2000
+      poll: 20
+      register: cloned
+      until: "cloned is not failed"
+      retries: 10
+      delay: 5
+      with_items:
+        - "{{local_Projects}}"
+        - csa
+      when: not ansible_host == central_db_ip
+
+    - name: Fix permissions2222
+      script: "/home/ubuntu/ubuntu_doctor_v2/scripts/permission.sh"
+      register: fixing_permissons
+
+    - name: Fix permissions message
+      debug:
+        msg: "{{fixing_permissons}}"
+
+    - name: delete vendor in display
+      # become_user: ubuntu
+      #  become: yes
+      shell: "rm /etc/apache2/sites-available/000-default.conf"
+      ignore_errors: true
+    ############################ ubuntu doctor ###################################
+    - name: check ubuntu doctor
+      stat:
+        path: /home/ubuntu/ubuntu_doctor_v2_1112023/
+      register: check_ubuntu_doctor
+
+    - name: copy Scripts
+      copy:
+        src: /home/ubuntu/ubuntu_doctor_v2/
+        dest: /home/ubuntu/ubuntu_doctor_v2/
+        mode: u+rwx,g-rwx,o-rwx
+      when: not check_ubuntu_doctor.stat.exists
+
+    - name: copy database file
+      become_user: ubuntu
+      become: yes
+      copy:
+        src: /home/ubuntu/ubuntu_doctor_v2/scripts/database.php
+        dest: /var/www/{{item}}/config/database.php
+        mode: u+rwx,g-rwx,o-rwx
+      with_items:
+        - msa
+        - MobileWCSA
+      when: ansible_host == central_db_ip
+
+    - name: Run setupcron
+      script: /home/ubuntu/ubuntu_doctor_v2/scripts/setup.sh "{{ ansible_host }}" "." "." "." "{{ central_db_ip }}" "{{ db_password }}" "{{ branch_name }}"
+      register: setup
+      until: "setup is not failed"
+      retries: 5
+      delay: 10
+
+    - name: copy laravel echo server file
+      shell: "cp /var/www/ems/laravel-echo-server.json /var/www/"
+
+    - name: copy Vhosts
+      copy:
+        src: /home/ubuntu/ubuntu_doctor_v2/apacheconfigfiles/
+        dest: /etc/apache2/sites-available/
+
+    - name: enable rewrite module
+      shell: "a2enmod rewrite"
+      args:
+        chdir: /etc/apache2/sites-available/
+
+    - name: enable vhosts
+      shell: "a2ensite *"
+      args:
+        chdir: /etc/apache2/sites-available/
+
+    - name: open apache ports
+      script: /home/ubuntu/ubuntu_doctor_v2/scripts/enable_apps.sh
+
+    - name: Restart Apachce webserver
+      service:
+        name: apache2
+        state: restarted
+
+    ############################# composer install && migration#################
+    - name: install EMS && MSA composer for central branch
+      become_user: ubuntu
+      become: true
+      community.general.composer:
+        command: install
+        working_dir: /var/www/{{item}}
+      with_items:
+        - msa
+        - ems
+      register: composer_installed_MSA_EMS
+      until: "composer_installed_MSA_EMS is not failed"
+      retries: 10
+      delay: 10
+      when: ansible_host == central_db_ip
+
+    - name: migrate DBs for central
+      become_user: ubuntu
+      become: true
+      shell: "php artisan migrate:fresh"
+      args:
+        chdir: /var/www/{{item}}
+      with_items:
+        - msa
+        - ems
+      when: ansible_host == central_db_ip
+      register: central_db_migration
+
+    - name: print central db migration
+      debug:
+        msg: "{{central_db_migration.results}}"
+
+    - name: install EMS composer for local branches
+      become_user: ubuntu
+      become: true
+      community.general.composer:
+        command: install
+        working_dir: /var/www/ems
+      register: composer_installed_EMS
+      until: "composer_installed_EMS is not failed"
+      retries: 10
+      delay: 10
+      when: not ansible_host == central_db_ip
+
+    - name: migrate local ubuntu_DB for local branches
+      become_user: ubuntu
+      become: true
+      shell: "php artisan migrate:fresh"
+      args:
+        chdir: /var/www/ems
+      when: not ansible_host == central_db_ip
+      register: local_db_migration
+
+    - name: print local db
+      debug:
+        msg: "{{local_db_migration}}"
+
+    - name: install composer for the rest of projects
+      become_user: ubuntu
+      become: true
+      community.general.composer:
+        command: install
+        working_dir: /var/www/{{item}}
+      with_items:
+        - "{{local_Projects}}"
+        - csa
+      register: composer_installed_projects
+      until: "composer_installed_projects is not failed"
+      retries: 10
+      delay: 10
+
+    - name: clear cache
+      script: /home/ubuntu/ubuntu_doctor_v2/clearcachebranch.sh
+      register: clear_cache
+    - name:
+      debug:
+        msg: "{{clear_cache}}"
+
+    - name: Installing npm
+      become: true
+      become_user: ubuntu
+      shell: "npm install"
+      args:
+        chdir: /var/www/msa
+        warn: false
+      when: ansible_host == central_db_ip
+
+    - name: install laravel_echo_server file
+      shell: "npm install -g laravel-echo-server"
+      args:
+        chdir: /var/www
+
+    - name: last Fix permissions
+      script: "/home/ubuntu/ubuntu_doctor_v2/scripts/permission.sh"
+
+    ################################ run redis #############################
+    - name: redis permissions
+      script: "/home/ubuntu/ubuntu_doctor_v2/startredis.sh"
+      register: redis_started
+    - name: redis status
+      debug:
+        msg: "{{redis_started}}"
+
+    - name: apache sudo privilages
+      script: "/home/ubuntu/ubuntu_doctor_v2/firstscript.sh"
+      args:
+        chdir: /home/ubuntu/ubuntu_doctor_v2
+#######################################################################
