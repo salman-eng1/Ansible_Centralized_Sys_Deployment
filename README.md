@@ -2,7 +2,8 @@
 _______________________QMS deployment with Ansible ____________________________
 
 1- install ansible on the master node
-2- extract the attached playbooks into /etc/ansible/ & the attached ubuntu_doctor folder to the path /home/master_dir/
+2- extract the attached playbooks into /etc/ansible/ 
+ - extractthe attached ubuntu_doctor folder to the path /home/master_dir/
 
 3- add the lines below to /etc/ansible/ansible.cfg:
      
