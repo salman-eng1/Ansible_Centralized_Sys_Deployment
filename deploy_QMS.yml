@@ -163,7 +163,7 @@
       become_user: ubuntu
       become: true
       git:
-        repo: "https://salman:{{token*********}}@gitlab.com/zeour1/{{path}}/{{item}}.git"
+        repo: "https://salman:{{token*********}}@gitlab.com/devops/{{path}}/{{item}}.git"
         dest: /var/www/{{item}}
         clone: yes
         force: yes
